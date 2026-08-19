@@ -136,8 +136,24 @@ async function onStartButton() {
     debug.set("state", "REQUESTING_PERMISSIONS");
     debug.render();
 
-    await motion.requestPermissions();
-    await capture.start();
+    console.log("[START] requesting permissions and camera");
+
+    // iOS Safari対策:
+    // ボタン押下の直後に、モーション許可とカメラ取得を同時に開始する。
+    const motionPromise = motion.requestPermissions().catch((error) => {
+      console.warn("[MOTION_PERMISSION_WARNING]", error);
+    });
+
+    const capturePromise = capture.start();
+
+    try {
+      await capturePromise;
+    } catch (cameraError) {
+      await motionPromise.catch(() => {});
+      throw cameraError;
+    }
+
+    await motionPromise;
 
     motion.start();
 
@@ -149,8 +165,12 @@ async function onStartButton() {
     frameCount = 0;
     lastFpsAt = performance.now();
 
+    console.log("[START] capture ready");
+
     scheduleNextFrame();
   } catch (error) {
+    console.error("[START_FAILED]", error);
+
     const message = error?.message || "UNKNOWN_ERROR";
 
     els.error.textContent = message;
@@ -316,10 +336,10 @@ function updateWorldStats(force = false) {
     `METRIC: UNRESOLVED`,
   ].join("\n");
 
-  if (force || pointCount === 0) {
-    if (pointCount === 0) {
-      setWorldMessage("WORLD EMPTY / NO_VALID_SPATIAL_DATA");
-    }
+  if (pointCount === 0) {
+    setWorldMessage("WORLD EMPTY / NO_VALID_SPATIAL_DATA");
+  } else if (force) {
+    setWorldMessage("");
   }
 }
 
@@ -468,3 +488,6 @@ function buildStatusText(motionStatus, mappingMetrics) {
 
   return lines.join("\n");
 }
+
+console.log("[BOOT] main.js loaded");
+window.__SPATIAL_MAPPING_MAIN_LOADED__ = true;
