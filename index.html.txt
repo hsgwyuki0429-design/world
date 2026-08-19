@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+  <title>Safari Spatial Mapping Prototype</title>
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #000;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+      overflow: hidden;
+    }
+
+    #camera {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #000;
+    }
+
+    #featureOverlay,
+    #worldViewCanvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    #worldViewCanvas {
+      touch-action: none;
+    }
+
+    #processing {
+      display: none;
+    }
+
+    #overlay,
+    .worldUi {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding:
+        max(12px, env(safe-area-inset-top))
+        max(12px, env(safe-area-inset-right))
+        max(12px, env(safe-area-inset-bottom))
+        max(12px, env(safe-area-inset-left));
+    }
+
+    #status,
+    #debug,
+    #worldStats,
+    #worldMessage {
+      background: rgba(0, 0, 0, 0.58);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      padding: 10px 12px;
+      white-space: pre-wrap;
+    }
+
+    #status {
+      font-size: 13px;
+      line-height: 1.45;
+      max-width: 92%;
+    }
+
+    #debug {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      line-height: 1.5;
+      max-height: 38vh;
+      overflow: auto;
+    }
+
+    #scanActions {
+      display: flex;
+      justify-content: flex-end;
+      pointer-events: none;
+    }
+
+    .smallButton,
+    .worldTop button {
+      pointer-events: auto;
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      color: #000;
+      background: #fff;
+    }
+
+    .smallButton:disabled,
+    .worldTop button:disabled {
+      opacity: 0.45;
+    }
+
+    #startScreen,
+    #worldScreen {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      background: rgba(0, 0, 0, 0.82);
+    }
+
+    #startScreen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    #startScreen h1 {
+      font-size: 26px;
+      letter-spacing: 0.045em;
+    }
+
+    #startScreen p {
+      color: #ddd;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    #start {
+      pointer-events: auto;
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      padding: 15px 26px;
+      min-width: 230px;
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      color: #000;
+      background: #fff;
+    }
+
+    #start:disabled {
+      opacity: 0.45;
+    }
+
+    #error {
+      color: #ff9f9f;
+      font-size: 14px;
+      min-height: 1.5em;
+      white-space: pre-wrap;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .worldTop {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+
+    .worldTop .title {
+      font-size: 15px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      align-self: center;
+      padding: 8px 0;
+    }
+
+    .worldToggles {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+      pointer-events: none;
+    }
+
+    .worldToggles label {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      background: rgba(0, 0, 0, 0.58);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      padding: 8px 10px;
+    }
+
+    #worldBottom {
+      display: grid;
+      gap: 10px;
+    }
+
+    #worldStats {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    #worldMessage {
+      font-size: 12px;
+      color: #ffd58f;
+    }
+
+    #worldFileInput {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <video id="camera" autoplay playsinline muted></video>
+  <canvas id="featureOverlay"></canvas>
+  <canvas id="processing"></canvas>
+
+  <div id="overlay">
+    <div id="status">STOPPED</div>
+
+    <div id="scanActions">
+      <button id="openWorld" class="smallButton" disabled>WORLD VIEW</button>
+    </div>
+
+    <pre id="debug"></pre>
+  </div>
+
+  <div id="worldScreen" class="hidden">
+    <canvas id="worldViewCanvas"></canvas>
+
+    <div class="worldUi">
+      <div>
+        <div class="worldTop">
+          <button id="backToScan">BACK</button>
+          <div class="title">WORLD VIEW</div>
+          <button id="liveWorld">LIVE</button>
+          <button id="saveWorld">SAVE</button>
+          <button id="loadWorld">LOAD</button>
+          <button id="resetWorldView">RESET</button>
+        </div>
+
+        <div class="worldToggles">
+          <label><input id="togglePoints" type="checkbox" checked /> POINTS</label>
+          <label><input id="togglePlanes" type="checkbox" checked /> PLANES</label>
+          <label><input id="togglePoses" type="checkbox" checked /> POSES</label>
+          <label><input id="toggleConfidence" type="checkbox" checked /> CONFIDENCE</label>
+        </div>
+      </div>
+
+      <div id="worldBottom">
+        <div id="worldMessage"></div>
+        <pre id="worldStats"></pre>
+      </div>
+    </div>
+
+    <input id="worldFileInput" type="file" accept="application/json" />
+  </div>
+
+  <div id="startScreen">
+    <h1>Safari Spatial Mapping</h1>
+    <p>Transform your surroundings into a Spatial World.</p>
+    <button id="start">START SCAN</button>
+    <div id="error"></div>
+    <p>
+      ※ HTTPS環境で開いてください。<br />
+      ※ カメラとモーション許可を要求します。
+    </p>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
