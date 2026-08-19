@@ -14,17 +14,24 @@ export class MotionManager {
   }
 
   async requestPermissions() {
-    this.orientationPermission = await this.requestPermission(
+    const orientationInterface =
       typeof DeviceOrientationEvent !== "undefined"
         ? DeviceOrientationEvent
-        : undefined
-    );
+        : undefined;
 
-    this.motionPermission = await this.requestPermission(
+    const motionInterface =
       typeof DeviceMotionEvent !== "undefined"
         ? DeviceMotionEvent
-        : undefined
-    );
+        : undefined;
+
+    // iOS Safari対策:
+    // awaitしてから次を呼ぶとユーザー操作コンテキストが切れる可能性があるため、
+    // 両方のpermission要求をこの場で即座に発行する。
+    const orientationPromise = this.requestPermission(orientationInterface);
+    const motionPromise = this.requestPermission(motionInterface);
+
+    this.orientationPermission = await orientationPromise;
+    this.motionPermission = await motionPromise;
   }
 
   async requestPermission(eventInterface) {
