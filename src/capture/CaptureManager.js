@@ -28,12 +28,25 @@ export class CaptureManager {
       throw new Error(this.mapMediaError(error));
     }
 
+    this.video.muted = true;
+    this.video.playsInline = true;
+    this.video.autoplay = true;
+
+    this.video.setAttribute("playsinline", "");
+    this.video.setAttribute("muted", "");
+    this.video.setAttribute("autoplay", "");
+
     this.video.srcObject = this.stream;
 
     try {
       await this.video.play();
     } catch {
-      throw new Error("VIDEO_PLAY_FAILED");
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 120));
+        await this.video.play();
+      } catch {
+        throw new Error("VIDEO_PLAY_FAILED");
+      }
     }
 
     this.state = "READY";
